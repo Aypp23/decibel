@@ -1,17 +1,17 @@
-# 🛡️ Decibel Guardian Bot
+# Decibel Guardian Bot
 
 Your personal liquidation defense system for Decibel. This bot monitors your perp positions in real-time and alerts you via Telegram before you get liquidated.
 
-## 🚀 Features
+## Features
 
-*   **🚨 Instant Liquidation Alerts**: Get notified when your position is close to liquidation (< 1s latency).
-*   **👛 Multi-Wallet Monitoring**: Track up to 5 wallets simultaneously.
-*   **🕵️ Whale Tracking**: Spy on other traders' new positions with `/track`.
-*   **🔔 Price Alerts**: Set custom price targets for any market.
-*   **📊 Account Stats**: View detailed PnL, Win Rate, and Volume analysis.
-*   **⚙️ Interactive Settings**: Adjust alert thresholds and durations instantly.
+*   **Instant Liquidation Alerts**: Get notified when your position is close to liquidation (< 1s latency).
+*   **Multi-Wallet Monitoring**: Track up to 5 wallets simultaneously.
+*   **Whale Tracking**: Spy on other traders' new positions with `/track`.
+*   **Price Alerts**: Set custom price targets for any market.
+*   **Account Stats**: View detailed PnL, Win Rate, and Volume analysis.
+*   **Interactive Settings**: Adjust alert thresholds and durations instantly.
 
-## 📋 Commands
+## Commands
 
 | Command | Description | Example |
 | :--- | :--- | :--- |
@@ -28,7 +28,7 @@ Your personal liquidation defense system for Decibel. This bot monitors your per
 | `/alerts` | View active alerts | `/alerts` |
 | `/stop` | Stop monitoring | `/stop` |
 
-## 🛠️ Deployment
+## Deployment
 
 ### Prerequisites
 *   Node.js

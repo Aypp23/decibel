@@ -34,8 +34,26 @@ async function getPositions(userAddr, cachedMarkets = null, cachedPrices = null)
         }
         const priceMap = new Map(prices.map(p => [p.market, p.mark_px]));
 
-        // 3. Fetch user positions
-        const positions = await read.userPositions.getByAddr({ subAddr: userAddr });
+        // 3. Fetch user positions (with fallback to direct fetch if SDK Zod validation fails)
+        let positions;
+        try {
+            positions = await read.userPositions.getByAddr({ subAddr: userAddr });
+        } catch (sdkError) {
+            if (sdkError.name === 'ZodError' || sdkError.message.includes('Invalid input')) {
+                console.warn(`[SDK BUG] Zod validation failed for ${userAddr}. Bypassing SDK with direct fetch.`);
+                const url = `https://api.testnet.aptoslabs.com/decibel/api/v1/positions?user=${userAddr}`;
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (!response.ok) throw sdkError;
+                positions = await response.json();
+            } else {
+                throw sdkError;
+            }
+        }
 
         // 4. Enrich positions
         return positions.map(pos => {

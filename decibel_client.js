@@ -10,10 +10,21 @@ const read = new DecibelReadDex(TESTNET_CONFIG, {
 
 async function getAccountOverview(userAddr) {
     try {
-        const overview = await read.accountOverview.getByAddr(userAddr);
-        return overview;
+        return await read.accountOverview.getByAddr(userAddr);
     } catch (error) {
-        console.error("Error fetching account overview:", error);
+        if (error.name === 'ZodError' || error.message.includes('Invalid input')) {
+            console.warn(`[SDK BUG] Account overview validation failed. Bypassing SDK.`);
+            const url = `https://api.testnet.aptoslabs.com/decibel/api/v1/account_overviews?user=${userAddr}`;
+            try {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
+                });
+                if (response.ok) return await response.json();
+            } catch (fetchError) {
+                console.error("Direct account overview fetch failed:", fetchError.message);
+            }
+        }
+        console.error("Error fetching account overview:", error.message);
         return null;
     }
 }
@@ -32,62 +43,77 @@ async function getPositions(userAddr, cachedMarkets = null, cachedPrices = null)
         if (!prices) {
             prices = await read.marketPrices.getAll();
         }
-        const priceMap = new Map(prices.map(p => [p.market, p.mark_px]));
+        const priceMap = new Map(prices.map(p => [p.market, parseFloat(p.mark_px)]));
 
-        // 3. Fetch user positions (with fallback to direct fetch if SDK Zod validation fails)
-        let positions;
+        // 3. Fetch user positions (with robust fallback)
+        let rawPositions = [];
         try {
-            positions = await read.userPositions.getByAddr({ subAddr: userAddr });
+            rawPositions = await read.userPositions.getByAddr({ subAddr: userAddr });
         } catch (sdkError) {
             if (sdkError.name === 'ZodError' || sdkError.message.includes('Invalid input')) {
-                console.warn(`[SDK BUG] Zod validation failed for ${userAddr}. Bypassing SDK with direct fetch.`);
+                console.warn(`[SDK BUG] Position validation failed for ${userAddr.slice(0, 10)}... Bypassing.`);
                 const url = `https://api.testnet.aptoslabs.com/decibel/api/v1/user_positions?user=${userAddr}`;
                 const response = await fetch(url, {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    }
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
                 });
-                if (!response.ok) throw sdkError;
-                positions = await response.json();
+                if (response.ok) {
+                    rawPositions = await response.json();
+                } else {
+                    console.error(`Direct fetch failed: ${response.status} ${response.statusText}`);
+                    throw sdkError;
+                }
             } else {
                 throw sdkError;
             }
         }
 
-        // 4. Enrich positions
-        return positions.map(pos => {
-            const marketName = marketMap.get(pos.market) || "Unknown Market";
-            const markPrice = priceMap.get(pos.market) || 0;
-            const pnl = (markPrice - pos.entry_price) * pos.size;
+        if (!Array.isArray(rawPositions)) {
+            console.error("Positions data is not an array:", rawPositions);
+            return [];
+        }
 
-            // Calculate liquidation price if not provided (though SDK seems to provide it)
-            // Using the one from SDK: estimated_liquidation_price
+        // 4. Enrich positions with safe defaults
+        return rawPositions.map(pos => {
+            const marketName = marketNameFromAddr(pos.market, marketMap);
+            const markPrice = priceMap.get(pos.market) || 0;
+            const entryPrice = parseFloat(pos.entry_price) || 0;
+            const size = parseFloat(pos.size) || 0;
+            const pnl = (markPrice - entryPrice) * size;
 
             return {
                 marketName,
                 marketAddr: pos.market,
-                size: pos.size,
-                entryPrice: pos.entry_price,
+                size: size,
+                entryPrice: entryPrice,
                 markPrice,
-                leverage: pos.user_leverage,
-                liquidationPrice: pos.estimated_liquidation_price,
+                leverage: pos.user_leverage || 0,
+                liquidationPrice: parseFloat(pos.estimated_liquidation_price) || 0,
                 unrealizedPnl: pnl,
-                unrealizedFunding: pos.unrealized_funding,
-                isIsolated: pos.is_isolated
+                unrealizedFunding: parseFloat(pos.unrealized_funding) || 0,
+                isIsolated: !!pos.is_isolated
             };
         });
 
     } catch (error) {
         if (error.message && (error.message.includes('429') || error.message.includes('Too Many Requests'))) {
-            const now = new Date().toISOString().split('T')[1].split('.')[0];
-            console.warn(`[${now}] ⚠️ Rate Limit Hit (429). Skipping update.`);
+            console.warn(`⚠️ Rate Limit Hit (429). Skipping update.`);
         } else {
-            console.error("Error fetching positions:", error);
+            console.error("Error fetching positions:", error.message);
         }
         return null;
     }
 }
+
+// Utility to humanize market names
+function marketNameFromAddr(addr, marketMap) {
+    if (marketMap.has(addr)) return marketMap.get(addr);
+    // Fallback search in map values if key is weird
+    for (const [mAddr, mName] of marketMap.entries()) {
+        if (mAddr.toLowerCase() === addr.toLowerCase()) return mName;
+    }
+    return "Unknown Market";
+}
+
 
 async function getTradeHistory(userAddr) {
     try {

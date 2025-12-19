@@ -112,7 +112,6 @@ bot.on('callback_query', async (callbackQuery) => {
         const { text, options } = getWalletsMessage(user);
         await editMsg(text, options);
 
-
     } else if (command === 'settings') {
         if (!user) {
             const { text, options } = getOnboardingMessage();
@@ -120,6 +119,13 @@ bot.on('callback_query', async (callbackQuery) => {
             return;
         }
         const { text, options } = getSettingsMessage(user);
+        await editMsg(text, options);
+
+    } else if (command === 'markets' || command === 'refresh_markets') {
+        if (command === 'markets') {
+            await editMsg("⏳ **Fetching Live Markets...**", { reply_markup: {} });
+        }
+        const { text, options } = await getMarketsMessage();
         await editMsg(text, options);
 
     } else if (command === 'set_t_up') {
@@ -231,6 +237,9 @@ function getDashboardMessage() {
                 ],
                 [
                     { text: '🕵️ Tracked Wallets', callback_data: 'tracking' },
+                    { text: '🌐 Markets', callback_data: 'markets' }
+                ],
+                [
                     { text: '⚙️ Settings', callback_data: 'settings' }
                 ],
             ]
@@ -872,6 +881,55 @@ bot.onText(/\/account/, async (msg) => {
 
 
 // Helper for Settings Message
+async function getMarketsMessage() {
+    let text = `🌐 **Live Markets**\n\n` +
+        `Fetching latest prices... ⏳`;
+
+    const options = {
+        parse_mode: 'Markdown',
+        reply_markup: {
+            inline_keyboard: [[{ text: '🔙 Back to Menu', callback_data: 'start' }]]
+        }
+    };
+
+    try {
+        const [markets, prices] = await Promise.all([
+            decibel.getMarkets(),
+            decibel.getMarketPrices()
+        ]);
+
+        if (!markets || !prices || markets.length === 0) {
+            text = `🌐 **Live Markets**\n\n` +
+                `❌ Error fetching market data. Please try again later.`;
+        } else {
+            const priceMap = new Map(prices.map(p => [p.market, parseFloat(p.mark_px)]));
+
+            text = `🌐 **Live Markets**\n\n` +
+                `| Market | Price |\n` +
+                `| :--- | :--- |\n`;
+
+            markets.forEach(m => {
+                const markPx = priceMap.get(m.market_addr);
+                const priceText = markPx ? `**$${markPx.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}**` : "N/A";
+                text += `| ${m.market_name} | ${priceText} |\n`;
+            });
+
+            text += `\n_Last Updated: ${new Date().toLocaleTimeString()}_`;
+        }
+
+        options.reply_markup.inline_keyboard = [
+            [{ text: '🔄 Refresh', callback_data: 'refresh_markets' }],
+            [{ text: '🔙 Back to Menu', callback_data: 'start' }]
+        ];
+    } catch (error) {
+        console.error("Error in getMarketsMessage:", error);
+        text = `🌐 **Live Markets**\n\n` +
+            `❌ Something went wrong while fetching data.`;
+    }
+
+    return { text, options };
+}
+
 function getSettingsMessage(user) {
     const threshold = user.alertThreshold;
     const duration = user.alertDuration;
@@ -1232,5 +1290,5 @@ async function monitorPositions() {
     }
 }
 
-// Run monitoring every 1 second (High Performance & Safe for ~5 wallets)
+// Run monitoring every 30 second (High Performance & Safe for ~5 wallets)
 setInterval(monitorPositions, 30000);

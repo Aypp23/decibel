@@ -41,7 +41,7 @@ async function getPositions(userAddr, cachedMarkets = null, cachedPrices = null)
         } catch (sdkError) {
             if (sdkError.name === 'ZodError' || sdkError.message.includes('Invalid input')) {
                 console.warn(`[SDK BUG] Zod validation failed for ${userAddr}. Bypassing SDK with direct fetch.`);
-                const url = `https://api.testnet.aptoslabs.com/decibel/api/v1/positions?user=${userAddr}`;
+                const url = `https://api.testnet.aptoslabs.com/decibel/api/v1/user_positions?user=${userAddr}`;
                 const response = await fetch(url, {
                     headers: {
                         'Authorization': `Bearer ${apiKey}`,

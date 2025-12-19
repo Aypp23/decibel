@@ -1233,4 +1233,4 @@ async function monitorPositions() {
 }
 
 // Run monitoring every 1 second (High Performance & Safe for ~5 wallets)
-setInterval(monitorPositions, 1000);
+setInterval(monitorPositions, 30000);

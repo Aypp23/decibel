@@ -2,6 +2,8 @@
 
 Your personal liquidation defense system for Decibel. This bot monitors your perp positions in real-time and alerts you via Telegram before you get liquidated.
 
+Use here: https://t.me/decibelliq_bot
+
 ## Features
 
 *   **Instant Liquidation Alerts**: Get notified when your position is close to liquidation (< 1s latency).
